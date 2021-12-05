@@ -26,7 +26,7 @@ data, making classifications, predictors and plotting results
 # Output: Filtered EEG Data
 
 #%% CLASSIFICATIONS
-
+# machine learning is cool
 # Generate or predict threshold values for the data. 
 # Input: Epoched EEG Data, filtered, start event times
 # Output: Predicted Events
