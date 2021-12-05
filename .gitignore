@@ -131,3 +131,5 @@ dmypy.json
 # don't worry about train / test data
 train/**
 test/**
+OG-grasp-and-lift-eeg-data/**
+*.DS_Store
