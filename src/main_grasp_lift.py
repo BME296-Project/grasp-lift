@@ -12,6 +12,7 @@ classification and make predictions of actions
 
 # %% IMPORTS
 import loadEEGData as eegdata
+import helper_grasp_lift as gl
 
 # %% CONSTANTS
 
@@ -24,6 +25,8 @@ DEFAULT_SERIES = 1 # which series to use, 1:8
 data = eegdata.loadData(subject=DEFAULT_SUBJECT, series=DEFAULT_SERIES, data_directory=DEFAULT_DIRECTORY)
 
 #%% EPOCH THE DATA
+
+eeg_epoch, truth_epoch = gl.epoch_data(data['eeg'], data['truth_data'])
 
 #%% FILTER THE DATA
 

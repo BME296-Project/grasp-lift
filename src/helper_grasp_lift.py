@@ -10,7 +10,7 @@ data, making classifications, predictors and plotting results
 """
 
 # %% IMPORTS
-
+import numpy as np
 
 # %% EPOCH THE DATA
 
@@ -18,6 +18,20 @@ data, making classifications, predictors and plotting results
 # Output: 3d array of epoched events. Raw data turned into chunks of data
 # NOTE: Look at experiement to see how it was set up. There may have been rough timing for each events. Then we can epoch around the center of that time window? 
 # NOTE: Check data for start and end point of potnetial epochs -> compare across subject
+
+def epoch_data(eeg_raw, truth_data, start_time=0, end_time=0):
+    
+    eeg_epoch = np.zeros([12, 9958, 32]) # 12 samples, don't hard code
+    truth_epoch = np.zeros([12, 9958, 6]) # 12 samples, don't hard code
+
+    for sample_index in range(12):
+        trial_index = sample_index * 9958
+        eeg_epoch[sample_index,:,:] = eeg_raw[trial_index:trial_index+9958,:]
+        truth_epoch[sample_index,:,:] = truth_data[trial_index:trial_index+9958,:]
+        
+
+    return eeg_epoch, truth_epoch
+
 
 #%% FILTERING
 
@@ -35,12 +49,12 @@ data, making classifications, predictors and plotting results
 # Then generate a prediction based on a threshold of some sort
 
 # Some variable names for predicted events
-is_predicted_hand_start
-is_predicted_first_touch
-is_predicted_grasp
-is_predicted_lift
-is_predicted_replace
-is_predicted_release
+# is_predicted_hand_start
+# is_predicted_first_touch
+# is_predicted_grasp
+# is_predicted_lift
+# is_predicted_replace
+# is_predicted_release
 
 #%% RESULTS
 
