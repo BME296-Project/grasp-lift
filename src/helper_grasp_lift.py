@@ -10,7 +10,8 @@ data, making classifications, predictors and plotting results
 """
 
 # %% IMPORTS
-
+import numpy as np
+from matplotlib import pyplot as plt
 
 # %% EPOCH THE DATA
 
