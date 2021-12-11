@@ -51,10 +51,17 @@ def loadData(subject=1, series=1, data_directory='../train'):
     data['channels'] = channels
     data['truth_data'] = truth_data
     data['events'] = events
+    
+    # known values from the experiment description
+    data['fs'] = 500
 
     # return the data
     return data
 
 #%% 
-data = loadData()
+
 # %%
+
+
+if __name__ == '__main__':
+    print("Import Only")
