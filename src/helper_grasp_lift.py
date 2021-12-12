@@ -11,6 +11,7 @@ data, making classifications, predictors and plotting results
 
 # %% IMPORTS
 import numpy as np
+from matplotlib import pyplot as plt
 
 # %% EPOCH THE DATA
 
@@ -47,14 +48,61 @@ def epoch_data(data, epoch_duration=1):
     return eeg_epoch, truth_epoch
 
 
-#%% FILTERING
+#%% TAKE FFT
 
 # Filter Data using fft things -> hilbert tranforms? scipy.filter.filtfilt()?
 # Input: Raw EEG data
 # Output: Filtered EEG Data
+# take FFT
+# Take mean power in 5-35Hz range (beta + mu rhythms)
+
+def take_FFT(eeg_epoch, fs):
+    # Take FFT of signal 
+    signal_fft = np.fft.rfft(eeg_epoch)
+    
+    # Get frequencies of FFT
+    signal_fft_freqs = np.fft.rfftfreq(len(eeg_epoch)) * fs
+    
+    # create band-stop filter to remove all signals outside of 5-35hz
+    filter_frequncy_response = np.ones(len(signal_fft_freqs))
+    filter_frequncy_response[signal_fft_freqs<=5] = 0 
+    filter_frequncy_response[signal_fft_freqs>=35] = 0 
+    
+    # Multiply signal FFT by frequncy response
+    filtered_fft = signal_fft * filter_frequncy_response
+    
+    # # Take inverse FFT of filtered signal
+    # filtered_signal = np.fft.irfft(filtered_fft)
+
+    # Get spectrum (signal power)
+    signal_power = filtered_fft *filtered_fft.conj()
+    # normalize spectrum
+    signal_power_norm = signal_power/np.max(signal_power)
+    # convert to decibels
+    signal_power_db = 10*np.log10(signal_power_norm)
+    
+    
+
+    # # Plot the power spectrum in dB
+    # plt.figure(453)
+    # plt.clf()
+    # plt.plot(signal_fft_freqs, signal_power_db)
+    
+    # # Annotate the plot
+    # plt.title('signal power spectrum')
+    # plt.xlabel('Frequency (Hz)')
+    # plt.ylabel('Power (dB)')
+    # plt.tight_layout()
+    
+    # mean_power = np.mean(signal_power_db)
+    
+    
+    
+    return filtered_fft, signal_power_db
 
 #%% CLASSIFICATIONS
 
+# Use an SVM to find the best weighted combination across electrodes
 # Generate or predict threshold values for the data. 
 # Input: Epoched EEG Data, filtered, start event times
 # Output: Predicted Events

@@ -33,6 +33,8 @@ eeg_epoch, truth_epoch = gl.epoch_data(data, DEFAULT_EPOCH_DURATION)
 
 #%% FILTER THE DATA
 
+signal_fft_freqs, signal_power_db = gl.take_FFT(eeg_epoch, data['fs'])
+
 #%% CLASSIFICATIONS
 
 gl.train_classification(eeg_epoch, truth_epoch, data['channels'], DEFAULT_CHANNELS_CLASSIFICATION)
