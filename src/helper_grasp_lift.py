@@ -12,6 +12,57 @@ data, making classifications, predictors and plotting results
 # %% IMPORTS
 import numpy as np
 from matplotlib import pyplot as plt
+from scipy import fft
+from scipy.signal import firwin, freqz, filtfilt, hilbert
+
+# %% MAKING A BAND PASS FILTER
+# Make band pass filter to get rid off all data not in mu rhythm range (8-13Hz)
+
+def filter_data(data, low_cutoff=8, high_cutoff=13, filter_order=5, fs=500, filter_type='hann'):
+    '''
+    This function makes a filter based on the parameters passed in and returns
+    the coefficients for the filter, then filters a signal using the 
+    filter coefficients.
+
+
+    Parameters
+    ----------
+    data : dictionary
+        raw data and realted channels and data information.
+    low_cutoff : int
+        lower cufoff frequency in Hz.
+    high_cutoff : int
+        higher cutoff frequency in Hz.
+    filter_order : int
+        The order of the filter to be made
+    fs : int
+        Sampling frequency of the data.
+    filter_type : string, optional
+        type of filter. defines how the filter performs. The default is "hann".
+
+    Returns
+    -------
+    filtered_data : np 2d array
+        the filtered data through the filter. size num_channels x num_samples
+
+    '''
+    
+    # Create an empty array for filter_coefficients
+    filter_coefficients = np.zeros(filter_order)
+    
+    # Create the FIR filter using scipy.firwin
+    numtaps = filter_order + 1
+    filter_coefficients = firwin(numtaps, cutoff=[low_cutoff, high_cutoff], fs=fs, window=filter_type, pass_zero='bandpass')
+    
+    # Now filter the raw eeg data
+    # Extract the raw data from the data dictionary
+    raw_data = data['eeg']
+    
+    # Use scipy.filter.filtfilt to apply the filter forward/backward in time 
+    # to each channel in the raw data    
+    filtered_data= filtfilt(b=filter_coefficients, a=1, x=raw_data)
+    
+    return filtered_data
 
 # %% EPOCH THE DATA
 
@@ -20,127 +71,57 @@ from matplotlib import pyplot as plt
 # NOTE: Look at experiement to see how it was set up. There may have been rough timing for each events. Then we can epoch around the center of that time window? 
 # NOTE: Check data for start and end point of potnetial epochs -> compare across subject
 
-def epoch_data(data, epoch_duration=1):
+def epoch_data(data):
 
     # separate out data
     eeg_raw = data['eeg']
     truth_data = data['truth_data']
     fs = data['fs']
 
-    # change different epoch sizes, default to be 1 second epoch pages
-    samples_per_epoch = int(fs*epoch_duration)
-    num_trials = int(len(eeg_raw)/samples_per_epoch)
+    # create an array of all the times the event starts (and ends)
+    # np.diff takes the difference between any 2 adj data points along a given axis
+    # np.where returns elements of an array that match a certain condition
+    # so np.where(np.diff(rowcol_id)>0) returns all of the flash onset times 
+    # from the col corresponding to "release"
+    start_times = np.asarray(np.where(np.diff(truth_data[:,5])>0))
+    end_times = np.asarray(np.where(np.diff(truth_data[:,5])<0))
+
+    # Add a 1 sec "buffer" to the start and end times
+    start_times = (start_times - fs).T
+    end_times = (end_times + fs).T
+    
+    # Get epoch parameters
+    samples_per_epoch = (end_times - start_times)[0][0] # number of samples per epoch
+    epoch_duration = int(samples_per_epoch/fs)          # length of each epoch in seconds
+    num_epochs = int(len(start_times))
     num_channels = eeg_raw.shape[1]
-    num_events = truth_data.shape[1]
 
     # NOTE: Add in Frequency and length of the eeg data things
     # pages x rows x cols
-    eeg_epoch = np.zeros([num_trials, samples_per_epoch, num_channels])
-    truth_epoch = np.zeros([num_trials, samples_per_epoch, num_events])
+    eeg_epochs = np.zeros([num_epochs, samples_per_epoch, num_channels])
 
     # for each page, 
-    for sample_index in range(num_trials):
-        trial_index = sample_index * samples_per_epoch
-        eeg_epoch[sample_index,:,:] = eeg_raw[trial_index:trial_index+samples_per_epoch,:]
-        truth_epoch[sample_index,:,:] = truth_data[trial_index:trial_index+samples_per_epoch,:]
-        
+    for sample_index in range(len(start_times)):
+        eeg_epochs[sample_index,:,:] = eeg_raw[start_times[sample_index][0]:end_times[sample_index][0],:]
 
-    return eeg_epoch, truth_epoch
+    return start_times, end_times, eeg_epochs
 
+# %% NEXT STEPS
 
-#%% TAKE FFT
+# 3-Square all values in the epoch array
 
-# Filter Data using fft things -> hilbert tranforms? scipy.filter.filtfilt()?
-# Input: Raw EEG data
-# Output: Filtered EEG Data
-# take FFT
-# Take mean power in 5-35Hz range (beta + mu rhythms)
+# 4- Within each epoch, take a window near the end to use as a baseline
 
-def take_FFT(eeg_epoch, fs):
-    # Take FFT of signal 
-    signal_fft = np.fft.rfft(eeg_epoch)
-    
-    # Get frequencies of FFT
-    signal_fft_freqs = np.fft.rfftfreq(len(eeg_epoch)) * fs
-    
-    # create band-stop filter to remove all signals outside of 5-35hz
-    filter_frequncy_response = np.ones(len(signal_fft_freqs))
-    filter_frequncy_response[signal_fft_freqs<=5] = 0 
-    filter_frequncy_response[signal_fft_freqs>=35] = 0 
-    
-    # Multiply signal FFT by frequncy response
-    filtered_fft = signal_fft * filter_frequncy_response
-    
-    # # Take inverse FFT of filtered signal
-    # filtered_signal = np.fft.irfft(filtered_fft)
+# 5- Meet with Jangraw again when he is not late for another meeting to geed feedback and go over next steps which to the best of my knowledge are...
 
-    # Get spectrum (signal power)
-    signal_power = filtered_fft *filtered_fft.conj()
-    # normalize spectrum
-    signal_power_norm = signal_power/np.max(signal_power)
-    # convert to decibels
-    signal_power_db = 10*np.log10(signal_power_norm)
-    
-    
+# 6- Subtract baseline from squared entries of each epoch to normalize data
 
-    # # Plot the power spectrum in dB
-    # plt.figure(453)
-    # plt.clf()
-    # plt.plot(signal_fft_freqs, signal_power_db)
-    
-    # # Annotate the plot
-    # plt.title('signal power spectrum')
-    # plt.xlabel('Frequency (Hz)')
-    # plt.ylabel('Power (dB)')
-    # plt.tight_layout()
-    
-    # mean_power = np.mean(signal_power_db)
-    
-    
-    
-    return filtered_fft, signal_power_db
+# %% PLOT RESULTS 
 
-#%% CLASSIFICATIONS
+# 7- Plot the data for electrodes C3 and C4, make qualitative observations about ERD and ERS
 
-# Use an SVM to find the best weighted combination across electrodes
-# Generate or predict threshold values for the data. 
-# Input: Epoched EEG Data, filtered, start event times
-# Output: Predicted Events
+# 8- Write report as if this was our original analysis all along and pretend we didn't change it halfway through
 
-def train_classification(eeg_epoch, truth_epoch, data_channels, channels):
-
-    # label each eeg epoch using truth data
-   
-
-    # get the number of trials we have
-    num_trials = eeg_epoch.shape[0]
-
-    # initialize arrays
-    mean_eeg = np.zeros([num_trials]) # eeg means
-    mean_truth = np.zeros([num_trials, 6]) # truth means
-
-    # get indexs for channels
-    channel_index = []
-    for channel in channels:
-        index = np.where(data_channels==channel)[0][0] # assumes 'channel' is valid 
-        channel_index.append(index)
-
-    # for each of the trials, compare to truth data
-    for trial_index in range(num_trials):
-        mean_eeg = np.mean(eeg_epoch[trial_index, :, channel_index])
-        mean_truth[trial_index,:] = np.mean(truth_epoch[trial_index, :, :], 0) 
-
-
-# Taking in the filtered data and some channels (realistically we should focus on just one for now) that we want to look at
-# Then generate a prediction based on a threshold of some sort
-
-# Some variable names for predicted events
-# is_predicted_hand_start
-# is_predicted_first_touch
-# is_predicted_grasp
-# is_predicted_lift
-# is_predicted_replace
-# is_predicted_release
 
 #%% RESULTS
 
