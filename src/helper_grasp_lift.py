@@ -87,12 +87,12 @@ def epoch_data(data):
     end_times = np.asarray(np.where(np.diff(truth_data[:,5])<0))
 
     # Add a 1 sec "buffer" to the start and end times
-    start_times = (start_times - fs).T
-    end_times = (end_times + fs).T
+    start_times = (start_times - 2*fs).T
+    end_times = (end_times + 2*fs).T
     
     # Get epoch parameters
     samples_per_epoch = (end_times - start_times)[0][0] # number of samples per epoch
-    epoch_duration = int(samples_per_epoch/fs)          # length of each epoch in seconds
+    epoch_duration = float(samples_per_epoch/fs)          # length of each epoch in seconds
     num_epochs = int(len(start_times))
     num_channels = eeg_raw.shape[1]
 
@@ -104,24 +104,53 @@ def epoch_data(data):
     for sample_index in range(len(start_times)):
         eeg_epochs[sample_index,:,:] = eeg_raw[start_times[sample_index][0]:end_times[sample_index][0],:]
 
-    return start_times, end_times, eeg_epochs
+    return start_times, end_times, eeg_epochs, epoch_duration
 
-# %% NEXT STEPS
+# %% Square Epoch
 
 # 3-Square all values in the epoch array
 
+def square_epoch(eeg_epochs):
+    squared_epochs=eeg_epochs**2
+    return squared_epochs
+
+# %% Baseline
+
 # 4- Within each epoch, take a window near the end to use as a baseline
+def baseline_epoch(squared_epochs):
+    baseline=np.zeros((34,32)) #fix me
+    for index in range(len(squared_epochs)): 
+        baseline[index,:]=np.mean(squared_epochs[index, 1650:2150, :], axis=0)
+    return baseline
 
-# 5- Meet with Jangraw again when he is not late for another meeting to geed feedback and go over next steps which to the best of my knowledge are...
+# %% Subract Baseline from Squared Entries
 
-# 6- Subtract baseline from squared entries of each epoch to normalize data
+def subract_baseline(squared_epochs ,baseline):
+    subtracted_baseline=np.zeros(np.shape(squared_epochs))
+    for index in range(len(squared_epochs)): 
+        subtracted_baseline[index,:,:]=squared_epochs[index,:,:]-baseline[index,:]
+    mean_baseline=np.mean(subtracted_baseline, axis=0)
+    return subtracted_baseline, mean_baseline
 
 # %% PLOT RESULTS 
 
 # 7- Plot the data for electrodes C3 and C4, make qualitative observations about ERD and ERS
+#   Get the Mean & StdErr across epochs of each type (motion and rest).
+#   Plot the mean +/- stderr on channels you'd expect to have motor activity.
 
-# 8- Write report as if this was our original analysis all along and pretend we didn't change it halfway through
-
+def plot_mean(mean_baseline, data, epoch_duration, channels_to_plot):
+    epoch_times = np.arange(0,epoch_duration,1/data['fs'])
+    channel1 = np.where(data['channels'] == channels_to_plot[0])[0][0]
+    channel2 = np.where(data['channels'] == channels_to_plot[1])[0][0]
+    plt.figure()
+    # Mean Plot
+    ax1 = plt.subplot(2,1,1)
+    ax1.plot(epoch_times,mean_baseline[:,channel1])
+    ax1.plot(epoch_times,mean_baseline[:,channel2])
+    #Std Error Plot
+    ax2 = plt.subplot(2,1,2)
+    ax2.plot()
+    return epoch_times
 
 #%% RESULTS
 
