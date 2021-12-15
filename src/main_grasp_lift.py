@@ -34,7 +34,7 @@ filtered_data = gl.filter_data(data)
 
 #%% EPOCH THE DATA
 
-start_times, end_times, eeg_epochs, epoch_duration = gl.epoch_data(data)
+start_times, end_times, event_epochs, rest_epochs, epoch_duration = gl.epoch_data(data, filtered_data)
 
 #%% SQUARE AND BASELINE
 

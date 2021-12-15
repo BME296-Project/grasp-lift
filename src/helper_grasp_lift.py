@@ -71,10 +71,9 @@ def filter_data(data, low_cutoff=8, high_cutoff=13, filter_order=5, fs=500, filt
 # NOTE: Look at experiement to see how it was set up. There may have been rough timing for each events. Then we can epoch around the center of that time window? 
 # NOTE: Check data for start and end point of potnetial epochs -> compare across subject
 
-def epoch_data(data):
+def epoch_data(data, filtered_data):
 
     # separate out data
-    eeg_raw = data['eeg']
     truth_data = data['truth_data']
     fs = data['fs']
 
@@ -86,25 +85,34 @@ def epoch_data(data):
     start_times = np.asarray(np.where(np.diff(truth_data[:,5])>0))
     end_times = np.asarray(np.where(np.diff(truth_data[:,5])<0))
 
-    # Add a 1 sec "buffer" to the start and end times
-    start_times = (start_times - 2*fs).T
-    end_times = (end_times + 2*fs).T
+    # Add a 2 sec "buffer" to the start each epoch 
+    # Note that the buffer added is 2 seconds worth of SAMPLES, not 2 seconds
+    buffered_start_times = (start_times - 2*fs).T
+    
+    # Calculate how long each event is
+    elapsed_event_times = end_times - start_times
+    # Add a buffer equal to the length of each event and 
+    # This will be used in a for loop below to get rest epochs have the same
+    # number of samples as the event epochs
+    buffered_end_times= ((end_times + elapsed_event_times) + 2*fs).T
     
     # Get epoch parameters
-    samples_per_epoch = (end_times - start_times)[0][0] # number of samples per epoch
+    samples_per_epoch = (end_times - buffered_start_times)[0][0] # number of samples per epoch
     epoch_duration = float(samples_per_epoch/fs)          # length of each epoch in seconds
     num_epochs = int(len(start_times))
-    num_channels = eeg_raw.shape[1]
+    num_channels = filtered_data.shape[1]
 
     # NOTE: Add in Frequency and length of the eeg data things
     # pages x rows x cols
-    eeg_epochs = np.zeros([num_epochs, samples_per_epoch, num_channels])
+    event_epochs = np.zeros([num_epochs, samples_per_epoch, num_channels])
+    rest_epochs = np.zeros([num_epochs, samples_per_epoch, num_channels])
 
     # for each page, 
     for sample_index in range(len(start_times)):
-        eeg_epochs[sample_index,:,:] = eeg_raw[start_times[sample_index][0]:end_times[sample_index][0],:]
-
-    return start_times, end_times, eeg_epochs, epoch_duration
+        event_epochs[sample_index,:,:] = filtered_data[buffered_start_times[sample_index][0]:end_times[sample_index][0],:]
+        rest_epochs[sample_index,:,:] = filtered_data[end_times[sample_index][0]:buffered_end_times[sample_index][0],:]
+        
+    return start_times, end_times, event_epochs, rest_epochs, epoch_duration
 
 # %% Square Epoch
 
@@ -125,7 +133,7 @@ def baseline_epoch(squared_epochs):
 
 # %% Subract Baseline from Squared Entries
 
-def subract_baseline(squared_epochs ,baseline):
+def subract_baseline(squared_epochs, baseline):
     subtracted_baseline=np.zeros(np.shape(squared_epochs))
     for index in range(len(squared_epochs)): 
         subtracted_baseline[index,:,:]=squared_epochs[index,:,:]-baseline[index,:]
