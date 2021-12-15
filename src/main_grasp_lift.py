@@ -34,17 +34,19 @@ filtered_data = gl.filter_data(data)
 
 #%% EPOCH THE DATA
 
-start_times, end_times, event_epochs, rest_epochs, epoch_duration = gl.epoch_data(data, filtered_data)
+start_times, end_times, buffered_start_times, buffered_end_times, event_epochs, rest_epochs, epoch_duration = gl.epoch_data(data, filtered_data)
 
 #%% SQUARE AND BASELINE
 
-squared_epochs=gl.square_epoch(eeg_epochs)
-baseline=gl.baseline_epoch(squared_epochs)
-subtracted_baseline, mean_baseline=gl.subract_baseline(squared_epochs, baseline)
+squared_event_epochs, squared_rest_epochs = gl.square_epoch(event_epochs, rest_epochs)
+baselines = gl.get_baselines(data, squared_rest_epochs)
+events_minus_baseline, mean_events, rests_minus_baseline, mean_rests = gl.subract_baseline(squared_event_epochs, squared_rest_epochs, baselines)
+
+#%% GET MEAN AND STANDARD ERROR
+mean_events, mean_rests, events_se, rests_se = gl.get_mean_SE(events_minus_baseline, rests_minus_baseline)
 
 #%% PLOT RESULTS
-
+# Specify channels to plot
 channels_to_plot=['C3', 'C4']
-epoch_times=gl.plot_mean(mean_baseline, data, epoch_duration, channels_to_plot)
 
-#%% RESULTS
+gl.plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_duration, channels_to_plot)

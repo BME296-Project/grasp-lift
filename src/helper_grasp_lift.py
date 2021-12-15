@@ -82,19 +82,20 @@ def epoch_data(data, filtered_data):
     # np.where returns elements of an array that match a certain condition
     # so np.where(np.diff(rowcol_id)>0) returns all of the flash onset times 
     # from the col corresponding to "release"
-    start_times = np.asarray(np.where(np.diff(truth_data[:,5])>0))
-    end_times = np.asarray(np.where(np.diff(truth_data[:,5])<0))
+    start_times = np.asarray(np.where(np.diff(truth_data[:,5])>0)).T
+    end_times = np.asarray(np.where(np.diff(truth_data[:,5])<0)).T
 
     # Add a 2 sec "buffer" to the start each epoch 
     # Note that the buffer added is 2 seconds worth of SAMPLES, not 2 seconds
-    buffered_start_times = (start_times - 2*fs).T
+    buffered_start_times = (start_times - 2*fs)
     
     # Calculate how long each event is
     elapsed_event_times = end_times - start_times
-    # Add a buffer equal to the length of each event and 
     # This will be used in a for loop below to get rest epochs have the same
     # number of samples as the event epochs
-    buffered_end_times= ((end_times + elapsed_event_times) + 2*fs).T
+    # Now add a buffer equal to the length of each event +2 secs
+    # This makes it so that all epochs are the same size
+    buffered_end_times= ((end_times + elapsed_event_times) + 2*fs)
     
     # Get epoch parameters
     samples_per_epoch = (end_times - buffered_start_times)[0][0] # number of samples per epoch
@@ -112,58 +113,88 @@ def epoch_data(data, filtered_data):
         event_epochs[sample_index,:,:] = filtered_data[buffered_start_times[sample_index][0]:end_times[sample_index][0],:]
         rest_epochs[sample_index,:,:] = filtered_data[end_times[sample_index][0]:buffered_end_times[sample_index][0],:]
         
-    return start_times, end_times, event_epochs, rest_epochs, epoch_duration
+    return start_times, end_times, buffered_start_times, buffered_end_times, event_epochs, rest_epochs, epoch_duration
 
 # %% Square Epoch
 
 # 3-Square all values in the epoch array
 
-def square_epoch(eeg_epochs):
-    squared_epochs=eeg_epochs**2
-    return squared_epochs
+def square_epoch(event_epochs, rest_epochs):
+    squared_event_epochs=event_epochs**2
+    squared_rest_epochs=rest_epochs**2
+    return squared_event_epochs, squared_rest_epochs
 
 # %% Baseline
 
 # 4- Within each epoch, take a window near the end to use as a baseline
-def baseline_epoch(squared_epochs):
-    baseline=np.zeros((34,32)) #fix me
-    for index in range(len(squared_epochs)): 
-        baseline[index,:]=np.mean(squared_epochs[index, 1650:2150, :], axis=0)
-    return baseline
+def get_baselines(data, squared_rest_epochs):
+    fs = data['fs']
+    
+    # Get indexes representing last 1 sec worth of rest data in an epoch
+    # where A is the start of that last second and B is the end
+    B = np.shape(squared_rest_epochs)[1]
+    A = B-fs
+    
+    baselines=np.zeros((34,32)) #fix me
+    for r_index in range(len(squared_rest_epochs)): 
+        baselines[r_index,:]=np.mean(squared_rest_epochs[r_index, A:B, :], axis=0)
+    return baselines
 
 # %% Subract Baseline from Squared Entries
 
-def subract_baseline(squared_epochs, baseline):
-    subtracted_baseline=np.zeros(np.shape(squared_epochs))
-    for index in range(len(squared_epochs)): 
-        subtracted_baseline[index,:,:]=squared_epochs[index,:,:]-baseline[index,:]
-    mean_baseline=np.mean(subtracted_baseline, axis=0)
-    return subtracted_baseline, mean_baseline
+def subract_baseline(squared_event_epochs, squared_rest_epochs, baselines):
+    events_minus_baseline=np.zeros(np.shape(squared_event_epochs))
+    for index in range(len(squared_event_epochs)): 
+        events_minus_baseline[index,:,:]=squared_event_epochs[index,:,:]-baselines[index,:]
+    
+    rests_minus_baseline=np.zeros(np.shape(squared_rest_epochs))
+    for index in range(len(squared_rest_epochs)): 
+        rests_minus_baseline[index,:,:]=squared_rest_epochs[index,:,:]-baselines[index,:]
+    
+    return events_minus_baseline, rests_minus_baseline
 
+# %% GET MEAN AND STANDARD ERROR
+
+def get_mean_SE(events_minus_baseline, rests_minus_baseline):
+    # Get the mean signal across all epochs for each channel
+    mean_events=np.mean(events_minus_baseline, axis=0)
+    mean_rests=np.mean(rests_minus_baseline, axis=0)
+    # Get the standard deviation of the signal across all epochs for each channel
+    events_std = np.std(events_minus_baseline, axis=0)
+    rests_std = np.std(rests_minus_baseline, axis=0)
+    # Get the standard error of the the signal across all epochs for each channel
+    events_se = events_std/np.sqrt(np.shape(events_minus_baseline)[1])
+    rests_se = rests_std/np.sqrt(np.shape(rests_minus_baseline)[1])
+
+    return mean_events, mean_rests, events_se, rests_se
 # %% PLOT RESULTS 
 
 # 7- Plot the data for electrodes C3 and C4, make qualitative observations about ERD and ERS
 #   Get the Mean & StdErr across epochs of each type (motion and rest).
 #   Plot the mean +/- stderr on channels you'd expect to have motor activity.
 
-def plot_mean(mean_baseline, data, epoch_duration, channels_to_plot):
+# Plot the mean +/- stderr on channels you'd expect to have motor activity. 
+# Are motion and rest epochs separated at the times and locations you'd expect?
+
+def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_duration, channels_to_plot):
     epoch_times = np.arange(0,epoch_duration,1/data['fs'])
     channel1 = np.where(data['channels'] == channels_to_plot[0])[0][0]
     channel2 = np.where(data['channels'] == channels_to_plot[1])[0][0]
-    # Mean Plot
-    mean_base=np.std(mean_baseline)
-    plt.plot(epoch_times,mean_baseline[:,channel1])
-    plt.plot(epoch_times,mean_baseline[:,channel2])
-    return epoch_times
+    # Plot event means for channels 1 and 2
+    channel1_means = plt.plot(epoch_times, mean_events[:, channel1], label='Channel 1 means')
+    channel2_means = plt.plot(epoch_times, mean_events[:, channel2], label='Channel 2 means')
+    
+    # Get upper limit for channel 1
+    channel1_UL = mean_events[:, channel1] + events_se[:, channel1]
+    # Get lower limit for channel 1
+    channel1_LL = mean_events[:, channel1] - events_se[:, channel1]
+    # Get upper limit for channel 2
+    channel2_UL = mean_events[:, channel2] + events_se[:, channel2]
+    # Get lower limit for channel 2
+    channel2_LL = mean_events[:, channel2] - events_se[:, channel2]
+    
+    # plot CI for event means using mean +/- stderr for channels 1 and 2
+    plt.fill_between(epoch_times, channel1_UL, channel1_LL, alpha=0.5, lw=5, label='Channel 1 +/- Standard Error')
+    plt.fill_between(epoch_times, channel2_UL, channel2_LL, alpha=0.5, lw=5, label='Channel 2 +/- Standard Error')
+    
 
-#%% RESULTS
-
-# Input: Predicted Events, Truth Events
-# Output: Confusion Matrix
-
-# Confusion Matrix to compare the the predicted and truth events
-# We can test using the given testing data things
-# Accuracy metric and ITR (becuase ITR is simple and pretty)
-
-if __name__ == '__main__':
-    print("Import Only")
