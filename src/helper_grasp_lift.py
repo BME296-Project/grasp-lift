@@ -142,14 +142,10 @@ def plot_mean(mean_baseline, data, epoch_duration, channels_to_plot):
     epoch_times = np.arange(0,epoch_duration,1/data['fs'])
     channel1 = np.where(data['channels'] == channels_to_plot[0])[0][0]
     channel2 = np.where(data['channels'] == channels_to_plot[1])[0][0]
-    plt.figure()
     # Mean Plot
-    ax1 = plt.subplot(2,1,1)
-    ax1.plot(epoch_times,mean_baseline[:,channel1])
-    ax1.plot(epoch_times,mean_baseline[:,channel2])
-    #Std Error Plot
-    ax2 = plt.subplot(2,1,2)
-    ax2.plot()
+    mean_base=np.std(mean_baseline)
+    plt.plot(epoch_times,mean_baseline[:,channel1])
+    plt.plot(epoch_times,mean_baseline[:,channel2])
     return epoch_times
 
 #%% RESULTS
