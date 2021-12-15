@@ -3,16 +3,26 @@
 """
 Created on Wed Dec  1 14:43:03 2021
 
-@author: george
+loadEEGData.py
 
-# TODO: Add section to import the truth data from the subject
+single function to load the data from the subject and series information. 
+Loads both the raw eeg data and the truth events. 
+Returns all the information in a dictionary
+
+@author: anna jane, brendan, george, jason
+
+
 """
-#%% 
+# %% IMPORTS
 import numpy as np
+
+
+# %% LOADING DATA
 
 def loadData(subject=1, series=1, data_directory='../train'):
     '''
-    load in one series from one subject. 
+    load in one series from one subject. loads both raw eeg and truth. 
+    Input data is in the form of csv files
 
     Parameters
     ----------
@@ -27,10 +37,11 @@ def loadData(subject=1, series=1, data_directory='../train'):
     Returns
     -------
     data : Dictionary
-        Dict of raw eeg values and channel names
+        Dict of raw eeg, chanels, truth data, events, and fs
 
     '''
     
+    # create the file paths from the input parameters
     data_file_path = f'{data_directory}/subj{subject}_series{series}_data.csv'
     truth_file_path = f'{data_directory}/subj{subject}_series{series}_events.csv'
     
@@ -58,10 +69,7 @@ def loadData(subject=1, series=1, data_directory='../train'):
     # return the data
     return data
 
-#%% 
-
-# %%
-
+# %% IMPORT CONTROL
 
 if __name__ == '__main__':
     print("Import Only")

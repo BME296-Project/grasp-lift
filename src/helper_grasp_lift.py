@@ -4,9 +4,11 @@
 helper_grasp_lift.py
 
 functions to help with data analysis. this includes epoching
-data, making classifications, predictors and plotting results
+filter data, create epochs, square and get baseline for data, 
+get the mean and standard error of the data, plot results.
 
-@author: george
+@author: anna jane, brendan, george, jason
+
 """
 
 # %% IMPORTS
@@ -62,16 +64,40 @@ def filter_data(data, low_cutoff=8, high_cutoff=13, filter_order=5, fs=500, filt
     # to each channel in the raw data    
     filtered_data= filtfilt(b=filter_coefficients, a=1, x=raw_data)
     
+    # return data
     return filtered_data
 
 # %% EPOCH THE DATA
 
-# Input: Raw EEG Data, start time, end time
-# Output: 3d array of epoched events. Raw data turned into chunks of data
-# NOTE: Look at experiement to see how it was set up. There may have been rough timing for each events. Then we can epoch around the center of that time window? 
-# NOTE: Check data for start and end point of potnetial epochs -> compare across subject
-
 def epoch_data(data, filtered_data):
+    '''
+    
+
+    Parameters
+    ----------
+    data : TYPE
+        DESCRIPTION.
+    filtered_data : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    start_times : TYPE
+        DESCRIPTION.
+    end_times : TYPE
+        DESCRIPTION.
+    buffered_start_times : TYPE
+        DESCRIPTION.
+    buffered_end_times : TYPE
+        DESCRIPTION.
+    event_epochs : TYPE
+        DESCRIPTION.
+    rest_epochs : TYPE
+        DESCRIPTION.
+    epoch_duration : TYPE
+        DESCRIPTION.
+
+    '''
 
     # separate out data
     truth_data = data['truth_data']
@@ -91,6 +117,7 @@ def epoch_data(data, filtered_data):
     
     # Calculate how long each event is
     elapsed_event_times = end_times - start_times
+    
     # This will be used in a for loop below to get rest epochs have the same
     # number of samples as the event epochs
     # Now add a buffer equal to the length of each event +2 secs
@@ -108,7 +135,7 @@ def epoch_data(data, filtered_data):
     event_epochs = np.zeros([num_epochs, samples_per_epoch, num_channels])
     rest_epochs = np.zeros([num_epochs, samples_per_epoch, num_channels])
 
-    # for each page, 
+    # for each page, get the data for that epoch and save to new array
     for sample_index in range(len(start_times)):
         event_epochs[sample_index,:,:] = filtered_data[buffered_start_times[sample_index][0]:end_times[sample_index][0],:]
         rest_epochs[sample_index,:,:] = filtered_data[end_times[sample_index][0]:buffered_end_times[sample_index][0],:]
@@ -121,65 +148,193 @@ def epoch_data(data, filtered_data):
 
 # %% Square Epoch
 
-# 3-Square all values in the epoch array
-
 def square_epoch(event_epochs, rest_epochs):
+    '''
+    square all the values in the epoch. This is close to how power calculation happens
+
+    Parameters
+    ----------
+    event_epochs : TYPE
+        DESCRIPTION.
+    rest_epochs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    squared_event_epochs : TYPE
+        DESCRIPTION.
+    squared_rest_epochs : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    # simply square the event epochs and the rest epochs
     squared_event_epochs=event_epochs**2
     squared_rest_epochs=rest_epochs**2
+    
+    # return the data
     return squared_event_epochs, squared_rest_epochs
 
 # %% Baseline
 
 # 4- Within each epoch, take a window near the end to use as a baseline
 def get_baselines(data, squared_rest_epochs):
+    '''
+    use the end of each epoch sample as a baseline for information. Get the 
+    baseline using the mean of each channel of each page. 
+
+    Parameters
+    ----------
+    data : TYPE
+        DESCRIPTION.
+    squared_rest_epochs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    baselines : TYPE
+        DESCRIPTION.
+
+    '''
     
     # Get indexes representing last 1 sec worth of rest data in an epoch
     # where A is the start of that last second and B is the end
     B = np.shape(squared_rest_epochs)[1]
     A = B-1
     
-    baselines=np.zeros((34,32)) #fix me
+    # get the number of pages and channels to loop through
+    num_pages = np.shape(squared_rest_epochs)[0]
+    num_channels = np.shape(squared_rest_epochs)[1]
+    
+    # create empty array to store the data. 
+    # num_pages x num_channels, should be 34 x 32 if using default values
+    baselines=np.zeros((num_pages,num_channels))
+    
+    # for each page, calculate the mean of the channels and save to array
     for r_index in range(len(squared_rest_epochs)): 
         baselines[r_index,:]=np.mean(squared_rest_epochs[r_index, A:B, :], axis=0)
+        
+    # return the data
     return baselines
 
 # %% Subract Baseline from Squared Entries
 
 def subract_baseline(squared_event_epochs, squared_rest_epochs, baselines):
+    '''
+    from the squared epochs and using the baseline information found earlier, 
+    subtract the baseline data from all the epoch channels. 
+
+    Parameters
+    ----------
+    squared_event_epochs : TYPE
+        DESCRIPTION.
+    squared_rest_epochs : TYPE
+        DESCRIPTION.
+    baselines : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    events_minus_baseline : TYPE
+        DESCRIPTION.
+    rests_minus_baseline : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    # subtract baseline for the event epochs
+
+    # create the array
     events_minus_baseline=np.zeros(np.shape(squared_event_epochs))
+    # for each epoch, subtract out the baseline for the channels
     for index in range(len(squared_event_epochs)): 
         events_minus_baseline[index,:,:]=squared_event_epochs[index,:,:]-baselines[index,:]
     
+    # subtract baseline for the rest epochs
+    
+    # create the array
     rests_minus_baseline=np.zeros(np.shape(squared_rest_epochs))
+    # for each epoch, subtract out the baseline for the channels
     for index in range(len(squared_rest_epochs)): 
         rests_minus_baseline[index,:,:]=squared_rest_epochs[index,:,:]-baselines[index,:]
     
+    # return the data
     return events_minus_baseline, rests_minus_baseline
 
 # %% GET MEAN AND STANDARD ERROR
 
 def get_mean_SE(events_minus_baseline, rests_minus_baseline):
+    '''
+    Calculate the mean and standard error for the event and the rest
+
+    Parameters
+    ----------
+    events_minus_baseline : TYPE
+        DESCRIPTION.
+    rests_minus_baseline : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    mean_events : TYPE
+        DESCRIPTION.
+    mean_rests : TYPE
+        DESCRIPTION.
+    events_se : TYPE
+        DESCRIPTION.
+    rests_se : TYPE
+        DESCRIPTION.
+
+    '''
     # Get the mean signal across all epochs for each channel
     mean_events=np.mean(events_minus_baseline, axis=0)
     mean_rests=np.mean(rests_minus_baseline, axis=0)
+    
     # Get the standard deviation of the signal across all epochs for each channel
     events_std = np.std(events_minus_baseline, axis=0)
     rests_std = np.std(rests_minus_baseline, axis=0)
+    
     # Get the standard error of the the signal across all epochs for each channel
     events_se = events_std/np.sqrt(np.shape(events_minus_baseline)[1])
     rests_se = rests_std/np.sqrt(np.shape(rests_minus_baseline)[1])
 
+    # return everything
     return mean_events, mean_rests, events_se, rests_se
+
 # %% PLOT RESULTS 
 
-# 7- Plot the data for electrodes C3 and C4, make qualitative observations about ERD and ERS
-#   Get the Mean & StdErr across epochs of each type (motion and rest).
-#   Plot the mean +/- stderr on channels you'd expect to have motor activity.
-
-# Plot the mean +/- stderr on channels you'd expect to have motor activity. 
-# Are motion and rest epochs separated at the times and locations you'd expect?
-
 def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_duration, channels_to_plot, DEFAULT_SUBJECT, DEFAULT_SERIES):
+    '''
+    Plot the data for electrodes given. plot both mean +/- std error for the channels during the event and 
+    at rest. Save both figures
+
+
+    Parameters
+    ----------
+    mean_events : TYPE
+        DESCRIPTION.
+    mean_rests : TYPE
+        DESCRIPTION.
+    events_se : TYPE
+        DESCRIPTION.
+    rests_se : TYPE
+        DESCRIPTION.
+    data : TYPE
+        DESCRIPTION.
+    epoch_duration : TYPE
+        DESCRIPTION.
+    channels_to_plot : TYPE
+        DESCRIPTION.
+    DEFAULT_SUBJECT : TYPE
+        DESCRIPTION.
+    DEFAULT_SERIES : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
     
     # Get epoch times (in seconds)
     epoch_times = np.arange(0,epoch_duration,1/data['fs'])
@@ -221,7 +376,6 @@ def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_durat
     # Save the figure
     plt.savefig('events.png')
     
-    
     # Repeat the above for the rest epochs
     # Create figure
     plt.figure('rests')
@@ -255,24 +409,4 @@ def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_durat
     
     # Save the figure
     plt.savefig('rests.png')
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
