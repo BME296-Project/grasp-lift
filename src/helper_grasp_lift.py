@@ -113,6 +113,10 @@ def epoch_data(data, filtered_data):
         event_epochs[sample_index,:,:] = filtered_data[buffered_start_times[sample_index][0]:end_times[sample_index][0],:]
         rest_epochs[sample_index,:,:] = filtered_data[end_times[sample_index][0]:buffered_end_times[sample_index][0],:]
         
+    # Convert epochs from SAMPLES to SECONDS
+    event_epochs = event_epochs / fs
+    rest_epochs = rest_epochs / fs
+    
     return start_times, end_times, buffered_start_times, buffered_end_times, event_epochs, rest_epochs, epoch_duration
 
 # %% Square Epoch
@@ -128,12 +132,11 @@ def square_epoch(event_epochs, rest_epochs):
 
 # 4- Within each epoch, take a window near the end to use as a baseline
 def get_baselines(data, squared_rest_epochs):
-    fs = data['fs']
     
     # Get indexes representing last 1 sec worth of rest data in an epoch
     # where A is the start of that last second and B is the end
     B = np.shape(squared_rest_epochs)[1]
-    A = B-fs
+    A = B-1
     
     baselines=np.zeros((34,32)) #fix me
     for r_index in range(len(squared_rest_epochs)): 
@@ -176,25 +179,100 @@ def get_mean_SE(events_minus_baseline, rests_minus_baseline):
 # Plot the mean +/- stderr on channels you'd expect to have motor activity. 
 # Are motion and rest epochs separated at the times and locations you'd expect?
 
-def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_duration, channels_to_plot):
+def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_duration, channels_to_plot, DEFAULT_SUBJECT, DEFAULT_SERIES):
+    
+    # Get epoch times (in seconds)
     epoch_times = np.arange(0,epoch_duration,1/data['fs'])
+    
+    # Extract channels to plot
     channel1 = np.where(data['channels'] == channels_to_plot[0])[0][0]
     channel2 = np.where(data['channels'] == channels_to_plot[1])[0][0]
-    # Plot event means for channels 1 and 2
-    channel1_means = plt.plot(epoch_times, mean_events[:, channel1], label='Channel 1 means')
-    channel2_means = plt.plot(epoch_times, mean_events[:, channel2], label='Channel 2 means')
+    
+    # Create figure
+    plt.figure('events')
+    plt.clf()
+    
+    # Plot mean_events over time for channels 1 and 2
+    plt.plot(epoch_times, mean_events[:, channel1], label=f'{channels_to_plot[0]} Means')
+    plt.plot(epoch_times, mean_events[:, channel2], label=f'{channels_to_plot[1]} Means')
     
     # Get upper limit for channel 1
-    channel1_UL = mean_events[:, channel1] + events_se[:, channel1]
+    channel1_event_UL = mean_events[:, channel1] + events_se[:, channel1]
     # Get lower limit for channel 1
-    channel1_LL = mean_events[:, channel1] - events_se[:, channel1]
+    channel1_event_LL = mean_events[:, channel1] - events_se[:, channel1]
     # Get upper limit for channel 2
-    channel2_UL = mean_events[:, channel2] + events_se[:, channel2]
+    channel2_event_UL = mean_events[:, channel2] + events_se[:, channel2]
     # Get lower limit for channel 2
-    channel2_LL = mean_events[:, channel2] - events_se[:, channel2]
+    channel2_event_LL = mean_events[:, channel2] - events_se[:, channel2]
     
     # plot CI for event means using mean +/- stderr for channels 1 and 2
-    plt.fill_between(epoch_times, channel1_UL, channel1_LL, alpha=0.5, lw=5, label='Channel 1 +/- Standard Error')
-    plt.fill_between(epoch_times, channel2_UL, channel2_LL, alpha=0.5, lw=5, label='Channel 2 +/- Standard Error')
+    plt.fill_between(epoch_times, channel1_event_UL, channel1_event_LL, alpha=0.5, lw=5, label=f'{channels_to_plot[0]} +/- Standard Error')
+    plt.fill_between(epoch_times, channel2_event_UL, channel2_event_LL, alpha=0.5, lw=5, label=f'{channels_to_plot[1]} +/- Standard Error')
     
-
+    # Annotate plot
+    plt.title(f'Events: Event Related (De)synchronization for Subject {DEFAULT_SUBJECT} Series {DEFAULT_SERIES}')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Voltage (V)')
+    plt.legend()
+    
+    # Make it look nice :)
+    plt.tight_layout()
+    
+    # Save the figure
+    plt.savefig('events.png')
+    
+    
+    # Repeat the above for the rest epochs
+    # Create figure
+    plt.figure('rests')
+    plt.clf()
+    
+    # Plot mean_events over time for channels 1 and 2
+    plt.plot(epoch_times, mean_rests[:, channel1], label=f'{channels_to_plot[0]} Means')
+    plt.plot(epoch_times, mean_rests[:, channel2], label=f'{channels_to_plot[1]} Means')
+    
+    # Get upper limit for channel 1
+    channel1_rest_UL = mean_rests[:, channel1] + rests_se[:, channel1]
+    # Get lower limit for channel 1
+    channel1_rest_LL = mean_rests[:, channel1] - rests_se[:, channel1]
+    # Get upper limit for channel 2
+    channel2_rest_UL = mean_rests[:, channel2] + rests_se[:, channel2]
+    # Get lower limit for channel 2
+    channel2_rest_LL = mean_rests[:, channel2] - rests_se[:, channel2]
+    
+    # plot CI for event means using mean +/- stderr for channels 1 and 2
+    plt.fill_between(epoch_times, channel1_rest_UL, channel1_rest_LL, alpha=0.5, lw=5, label=f'{channels_to_plot[0]} +/- Standard Error')
+    plt.fill_between(epoch_times, channel2_rest_UL, channel2_rest_LL, alpha=0.5, lw=5, label=f'{channels_to_plot[1]} +/- Standard Error')
+    
+    # Annotate plot
+    plt.title(f'Rests: Event Related (De)synchronization for Subject {DEFAULT_SUBJECT} Series {DEFAULT_SERIES}')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Voltage (V)')
+    plt.legend()
+    
+    # Make it look nice :)
+    plt.tight_layout()
+    
+    # Save the figure
+    plt.savefig('rests.png')
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
