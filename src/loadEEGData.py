@@ -3,7 +3,7 @@
 """
 Created on Wed Dec  1 14:43:03 2021
 
-loadEEGData.py
+loadEEGData.py 
 
 single function to load the data from the subject and series information. 
 Loads both the raw eeg data and the truth events. 

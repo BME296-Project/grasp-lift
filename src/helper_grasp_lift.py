@@ -71,31 +71,31 @@ def filter_data(data, low_cutoff=8, high_cutoff=13, filter_order=5, fs=500, filt
 
 def epoch_data(data, filtered_data):
     '''
-    
+    Turn the filtered data into into epochs
 
     Parameters
     ----------
-    data : TYPE
-        DESCRIPTION.
-    filtered_data : TYPE
-        DESCRIPTION.
+    data : Dictionary
+        Dict of raw eeg, chanels, truth data, events, and fs
+    filtered_data : np 2d array
+        the filtered data through the filter. size num_channels x num_samples
 
     Returns
     -------
-    start_times : TYPE
-        DESCRIPTION.
-    end_times : TYPE
-        DESCRIPTION.
-    buffered_start_times : TYPE
-        DESCRIPTION.
-    buffered_end_times : TYPE
-        DESCRIPTION.
-    event_epochs : TYPE
-        DESCRIPTION.
-    rest_epochs : TYPE
-        DESCRIPTION.
-    epoch_duration : TYPE
-        DESCRIPTION.
+    start_times : 1d np array
+        start time in samples for the event activity.
+    end_times : 1d np array
+        end time in samples for the event activity
+    buffered_start_times : 1d np array
+        start time in samples for the event activity. Offset to ensure all times are same size
+    buffered_end_times : 1d np array
+        end time in samples for the event activity. Offset to ensure all times are same size.
+    event_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the release events
+    rest_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the rest events
+    epoch_duration : float
+        length of the epochs in seconds.
 
     '''
 
@@ -154,17 +154,17 @@ def square_epoch(event_epochs, rest_epochs):
 
     Parameters
     ----------
-    event_epochs : TYPE
-        DESCRIPTION.
-    rest_epochs : TYPE
-        DESCRIPTION.
+    event_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the release events
+    rest_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the rest events
 
     Returns
     -------
-    squared_event_epochs : TYPE
-        DESCRIPTION.
-    squared_rest_epochs : TYPE
-        DESCRIPTION.
+    squared_event_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the release events squared to represent power
+    squared_rest_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the rest events squared to represent power
 
     '''
     
@@ -185,15 +185,15 @@ def get_baselines(data, squared_rest_epochs):
 
     Parameters
     ----------
-    data : TYPE
-        DESCRIPTION.
-    squared_rest_epochs : TYPE
-        DESCRIPTION.
+    data : Dictionary
+        Dict of raw eeg, chanels, truth data, events, and fs
+    squared_rest_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the rest events squared to represent power
 
     Returns
     -------
-    baselines : TYPE
-        DESCRIPTION.
+    baselines : 2d np array 
+        num_pages x num_channels for the means of the channels per epoch
 
     '''
     
@@ -204,7 +204,7 @@ def get_baselines(data, squared_rest_epochs):
     
     # get the number of pages and channels to loop through
     num_pages = np.shape(squared_rest_epochs)[0]
-    num_channels = np.shape(squared_rest_epochs)[1]
+    num_channels = np.shape(squared_rest_epochs)[2]
     
     # create empty array to store the data. 
     # num_pages x num_channels, should be 34 x 32 if using default values
@@ -226,19 +226,19 @@ def subract_baseline(squared_event_epochs, squared_rest_epochs, baselines):
 
     Parameters
     ----------
-    squared_event_epochs : TYPE
-        DESCRIPTION.
-    squared_rest_epochs : TYPE
-        DESCRIPTION.
-    baselines : TYPE
-        DESCRIPTION.
+    squared_event_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the release events squared to represent power
+    squared_rest_epochs : 3d np array
+        num_epochs x samples_per_epoch x num_channels for the rest events squared to represent power
+    baselines : 2d np array 
+        num_pages x num_channels for the means of the channels per epoch
 
     Returns
     -------
-    events_minus_baseline : TYPE
-        DESCRIPTION.
-    rests_minus_baseline : TYPE
-        DESCRIPTION.
+    events_minus_baseline : 3d np array
+        num_epochs x samples_per_epoch x num_channels. Same epochs with baselines subtracted out
+    rests_minus_baseline : 3d np array
+        num_epochs x samples_per_epoch x num_channels. Same epochs with baselines subtracted out
 
     '''
     
@@ -269,21 +269,21 @@ def get_mean_SE(events_minus_baseline, rests_minus_baseline):
 
     Parameters
     ----------
-    events_minus_baseline : TYPE
-        DESCRIPTION.
-    rests_minus_baseline : TYPE
-        DESCRIPTION.
+    events_minus_baseline : 3d np array
+        num_epochs x samples_per_epoch x num_channels. Same epochs with baselines subtracted out
+    rests_minus_baseline : 3d np array
+        num_epochs x samples_per_epoch x num_channels. Same epochs with baselines subtracted out
 
     Returns
     -------
-    mean_events : TYPE
-        DESCRIPTION.
-    mean_rests : TYPE
-        DESCRIPTION.
-    events_se : TYPE
-        DESCRIPTION.
-    rests_se : TYPE
-        DESCRIPTION.
+    mean_events : 1d array
+        mean signal across all epochs for each channel for release events
+    mean_rests : 1d array
+        mean signal across all epochs for each channel for rest events
+    events_se : 1d array
+        standard deviation of the signal across all epochs for each channel for release events.
+    rests_se : 1d array
+        standard deviation of the signal across all epochs for each channel for rest events.
 
     '''
     # Get the mean signal across all epochs for each channel
@@ -311,24 +311,24 @@ def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_durat
 
     Parameters
     ----------
-    mean_events : TYPE
-        DESCRIPTION.
-    mean_rests : TYPE
-        DESCRIPTION.
-    events_se : TYPE
-        DESCRIPTION.
-    rests_se : TYPE
-        DESCRIPTION.
-    data : TYPE
-        DESCRIPTION.
-    epoch_duration : TYPE
-        DESCRIPTION.
-    channels_to_plot : TYPE
-        DESCRIPTION.
-    DEFAULT_SUBJECT : TYPE
-        DESCRIPTION.
-    DEFAULT_SERIES : TYPE
-        DESCRIPTION.
+    mean_events : 1d array
+        mean signal across all epochs for each channel for release events
+    mean_rests : 1d array
+        mean signal across all epochs for each channel for rest events
+    events_se : 1d array
+        standard deviation of the signal across all epochs for each channel for release events.
+    rests_se : 1d array
+        standard deviation of the signal across all epochs for each channel for rest events.
+    data : Dictionary
+        Dict of raw eeg, chanels, truth data, events, and fs
+    epoch_duration : float
+        length of the epochs in seconds.
+    channels_to_plot : 1d list
+        a list of channels to plot
+    DEFAULT_SUBJECT : int
+        the subject number from the data
+    DEFAULT_SERIES : int
+        the series the subject participated in
 
     Returns
     -------
@@ -408,5 +408,6 @@ def plot_results(mean_events, mean_rests, events_se, rests_se, data, epoch_durat
     plt.tight_layout()
     
     # Save the figure
+    print("Saving images... ")
     plt.savefig('rests.png')
     
